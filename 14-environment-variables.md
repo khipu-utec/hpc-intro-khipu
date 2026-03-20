@@ -1,0 +1,288 @@
+---
+title: Variables de Entorno
+teaching: 10
+exercises: 5
+---
+
+
+
+::::::::::::::::::::::::::::::::::::::: objectives
+
+- Entender cómo se implementan las variables de entorno en la shell.
+- Leer el valor de una variable existente.
+- Crear nuevas variables y cambiar sus valores.
+- Cambiar el comportamiento de un programa usando una variable de entorno.
+- Explicar cómo la shell usa la variable `PATH` para buscar ejecutables.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:::::::::::::::::::::::::::::::::::::::: questions
+
+- ¿Cómo se establecen y acceden las variables en la shell de Unix?
+- ¿Cómo puedo usar variables para cambiar cómo se ejecuta un programa?
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:::::::::::::::::::::::::::::::::::::::::  callout
+
+## Origen del episodio
+
+Este episodio ha sido remezclado a partir del
+[episodio de Shell Extras sobre Variables de Shell](https://github.com/carpentries-incubator/shell-extras/blob/gh-pages/_episodes/08-environment-variables.md)
+y del [episodio de HPC Shell sobre scripts](https://github.com/hpc-carpentry/hpc-shell/blob/gh-pages/_episodes/05-scripts.md).
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+La shell es solo un programa, y como otros programas, tiene variables. Esas
+variables controlan su ejecución, por lo que cambiando sus valores puedes
+cambiar cómo se comporta la shell (y con un poco más de esfuerzo cómo se
+comportan otros programas).
+
+Las variables son una excelente manera de guardar información bajo un nombre
+que puedas acceder más tarde. En lenguajes de programación como Python y R, las
+variables pueden almacenar prácticamente cualquier cosa que imagines. En la
+shell, generalmente solo almacenan texto. La mejor manera de entender cómo
+funcionan es verlas en acción.
+
+Comencemos ejecutando el comando `set` y observando algunas de las variables
+en una sesión típica de shell:
+
+```bash
+set
+```
+
+```output
+COMPUTERNAME=TURING
+HOME=/home/vlad
+HOSTNAME=TURING
+HOSTTYPE=i686
+NUMBER_OF_PROCESSORS=4
+PATH=/Users/vlad/bin:/usr/local/git/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin
+PWD=/home/vlad
+UID=1000
+USERNAME=vlad
+...
+```
+
+Como puedes ver, hay bastantes —de hecho, cuatro o cinco veces más que lo
+que se muestra aquí. Y sí, usar `set` para *mostrar* cosas puede parecer un
+poco extraño, incluso para Unix, pero si no le das argumentos, bien podría
+mostrarte cosas que *podrías* establecer.
+
+Cada variable tiene un nombre. Los valores de todas las variables de shell son
+cadenas de texto, incluso los que (como `UID`) parecen números. Es
+responsabilidad de los programas convertir estas cadenas a otros tipos cuando
+sea necesario. Por ejemplo, si un programa quisiera averiguar cuántos
+procesadores tiene la computadora, convertiría el valor de la variable
+`NUMBER_OF_PROCESSORS` de una cadena a un entero.
+
+## Mostrar el valor de una variable
+
+Mostremos el valor de la variable `HOME`:
+
+```bash
+echo HOME
+```
+
+```output
+HOME
+```
+
+Eso solo imprime "HOME", que no es lo que queremos (aunque es lo que
+realmente pedimos). Intentemos esto en lugar:
+
+```bash
+echo $HOME
+```
+
+```output
+/home/vlad
+```
+
+El signo de dólar le dice a la shell que queremos el *valor* de la variable
+en lugar de su nombre. Esto funciona igual que los comodines: la shell hace el
+reemplazo *antes* de ejecutar el programa que pedimos. Gracias a esta
+expansión, lo que realmente ejecutamos es `echo /home/vlad`, que muestra lo
+correcto.
+
+## Crear y cambiar variables
+
+Crear una variable es fácil: simplemente asignamos un valor a un nombre
+usando "=" (solo tenemos que recordar que la sintaxis requiere que no haya
+*ningún* espacio alrededor de `=`):
+
+```bash
+SECRET_IDENTITY=Dracula
+echo $SECRET_IDENTITY
+```
+
+```output
+Dracula
+```
+
+Para cambiar el valor, simplemente asigna uno nuevo:
+
+```bash
+SECRET_IDENTITY=Camilla
+echo $SECRET_IDENTITY
+```
+
+```output
+Camilla
+```
+
+## Variables de entorno
+
+Cuando ejecutamos el comando `set`, vimos que había muchas variables cuyos
+nombres estaban en mayúsculas. Eso es porque, por convención, las variables
+que también están disponibles para que las usen *otros* programas tienen nombres
+en mayúsculas. Tales variables se llaman *variables de entorno* ya que son
+variables de shell que se definen para la shell actual y son heredadas por
+cualquier shell secundaria o proceso.
+
+Para crear una variable de entorno necesitas `export` una variable de shell.
+Por ejemplo, para que nuestra `SECRET_IDENTITY` esté disponible para otros
+programas que llamamos desde nuestra shell podemos hacer:
+
+```bash
+SECRET_IDENTITY=Camilla
+export SECRET_IDENTITY
+```
+
+También puedes crear y exportar la variable en un solo paso:
+
+```bash
+export SECRET_IDENTITY=Camilla
+```
+
+:::::::::::::::::::::::::::::::::::::::  challenge
+
+## Usar variables de entorno para cambiar el comportamiento del programa
+
+Establece una variable de shell `TIME_STYLE` con un valor de `iso` y verifica
+este valor usando el comando `echo`.
+
+Ahora, ejecuta el comando `ls` con la opción `-l` (que da un formato largo).
+
+`export` la variable y vuelve a ejecutar el comando `ls -l`. ¿Notas alguna
+diferencia?
+
+:::::::::::::::  solution
+
+## Solución
+
+La variable `TIME_STYLE` no es *vista* por `ls` hasta que es exportada, en
+cuyo punto `ls` la usa para decidir qué formato de fecha usar al mostrar la
+marca de tiempo de los archivos.
+
+:::::::::::::::::::::::::
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Puedes ver el conjunto completo de variables de entorno en tu sesión de shell
+actual con el comando `env` (que devuelve un subconjunto de lo que el comando
+`set` nos dio). **El conjunto completo de variables de entorno se llama tu
+*entorno en tiempo de ejecución* y puede afectar el comportamiento de los
+programas que ejecutas**.
+
+:::::::::::::::::::::::::::::::::::::::  challenge
+
+## Variables de entorno de trabajo
+
+Cuando `Slurm` ejecuta un trabajo, establece varias variables
+de entorno para el trabajo. Una de estas nos permitirá verificar desde qué
+directorio se envió nuestro script de trabajo. La variable `SLURM_SUBMIT_DIR`
+se establece en el directorio desde el que se envió nuestro trabajo. Usando la
+variable `SLURM_SUBMIT_DIR`, modifica tu trabajo para que imprima la ubicación
+desde la cual se envió el trabajo.
+
+:::::::::::::::  solution
+
+## Solution
+
+```bash
+[yourUsername@login1 ~]$ nano example-job.sh
+[yourUsername@login1 ~]$ cat example-job.sh
+```
+
+```output
+#!/bin/bash
+#SBATCH -t 00:00:30
+
+echo -n "This script is running on "
+hostname
+
+echo "This job was launched in the following directory:"
+echo ${SLURM_SUBMIT_DIR}
+```
+
+:::::::::::::::::::::::::
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Para eliminar una variable o variable de entorno, puedes usar el comando
+`unset`, por ejemplo:
+
+```bash
+unset SECRET_IDENTITY
+```
+
+## La variable de entorno `PATH`
+
+Del mismo modo, algunas variables de entorno (como `PATH`) almacenan listas de
+valores. En este caso, la convención es usar dos puntos ':' como separador. Si
+un programa quiere los elementos individuales de tal lista, es responsabilidad
+del programa dividir el valor de cadena de la variable en partes.
+
+Veamos de cerca esa variable `PATH`. Su valor define la ruta de búsqueda de
+la shell para ejecutables, es decir, la lista de directorios en que la shell
+busca programas ejecutables cuando escribes un nombre de programa sin
+especificar en qué directorio está.
+
+Por ejemplo, cuando escribimos un comando como `analyze`, la shell necesita
+decidir si ejecutar `./analyze` o `/bin/analyze`. La regla que usa es simple:
+la shell verifica cada directorio en la variable `PATH` por turno, buscando un
+programa con el nombre solicitado en ese directorio. Tan pronto como encuentra
+una coincidencia, detiene la búsqueda y ejecuta el programa.
+
+Para mostrar cómo funciona, aquí están los componentes de `PATH` listados uno
+por línea:
+
+```output
+/Users/vlad/bin
+/usr/local/git/bin
+/usr/bin
+/bin
+/usr/sbin
+/sbin
+/usr/local/bin
+```
+
+En nuestra computadora, en realidad hay tres programas llamados `analyze` en
+tres directorios diferentes: `/bin/analyze`, `/usr/local/bin/analyze` y
+`/users/vlad/analyze`. Como la shell busca los directorios en el orden en que
+se enumeran en `PATH`, encuentra `/bin/analyze` primero y lo ejecuta. Observa
+que *nunca* encontrará el programa `/users/vlad/analyze` a menos que escribas
+la ruta completa al programa, ya que el directorio `/users/vlad` no está en
+`PATH`.
+
+Esto significa que puedo tener ejecutables en muchos lugares diferentes siempre
+que recuerde que necesito actualizar mi `PATH` para que mi shell pueda
+encontrarlos.
+
+¿Y si quiero ejecutar dos versiones diferentes del mismo programa? Como
+comparten el mismo nombre, si agrego ambas a mi `PATH`, la primera que se
+encuentre siempre ganará. En el próximo episodio aprenderemos a usar
+herramientas auxiliares para ayudarnos a gestionar nuestro entorno en tiempo
+de ejecución para hacer que eso sea posible sin que necesitemos hacer mucha
+contabilidad sobre cuál es o debería ser el valor de `PATH` (y otras variables
+de entorno importantes).
+
+:::::::::::::::::::::::::::::::::::::::: keypoints
+
+- Las variables de shell se tratan como cadenas de texto por defecto.
+- Las variables se asignan usando "`=`" y se recuperan usando el nombre de la variable con el prefijo "`$`".
+- Usa "`export`" para que una variable esté disponible para otros programas.
+- La variable `PATH` define la ruta de búsqueda de la shell.
+
+:::::::::::::::::::::::::::::::::::::::::::::::::

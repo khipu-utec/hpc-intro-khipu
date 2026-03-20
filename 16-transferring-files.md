@@ -1,0 +1,503 @@
+---
+title: Transferencia de archivos con computadoras remotas
+teaching: 15
+exercises: 15
+---
+
+
+
+::::::::::::::::::::::::::::::::::::::: objectives
+
+- Transferir archivos hacia y desde un clúster de cómputo.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:::::::::::::::::::::::::::::::::::::::: questions
+
+- ¿Cómo transfiero archivos hacia (y desde) el clúster?
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Trabajar en una computadora remota no es muy útil si no podemos obtener archivos
+hacia o desde él. Hay varias opciones para transferir datos entre
+recursos de cómputo usando herramientas CLI y GUI, algunas de las cuales cubriremos.
+
+## Descargar archivos de la lección desde Internet
+
+Una de las formas más directas de descargar archivos es usar `curl` o `wget`.
+Uno de estos suele estar instalado en la mayoría de las shells de Linux, en la
+terminal de macOS y en GitBash. Cualquier archivo que pueda descargarse en tu
+navegador web mediante un enlace directo puede descargarse usando `curl` o
+`wget`. Esta es una forma rápida de descargar conjuntos de datos o código fuente.
+La sintaxis de estos comandos es
+
+- `wget [-O new_name] https://some/link/to/a/file`
+- `curl [-o new_name] https://some/link/to/a/file`
+
+Pruébalo descargando algo del material que usaremos más adelante, desde una
+terminal en tu máquina local, usando la URL del código base actual:
+
+<https://github.com/hpc-carpentry/amdahl/tarball/main>
+
+:::::::::::::::::::::::::::::::::::::::  challenge
+
+## Descargar el "tarball"
+
+La palabra "tarball" en la URL anterior se refiere a un formato de archivo
+comprimido comúnmente usado en Linux, que es el sistema operativo en el que
+corre la mayoría de las máquinas de los clústeres HPC.
+Un tarball es muy parecido a un archivo `.zip`.
+La extensión real del archivo es `.tar.gz`, que refleja el proceso de dos etapas
+usado para crear el archivo:
+los archivos o carpetas se combinan en un solo archivo con `tar`, que luego se
+comprime con `gzip`, por lo que la extensión del archivo es "tar-punto-g-z".
+Es un trabalenguas, así que la gente suele decir "el tarball *xyz*".
+
+También puedes ver la extensión `.tgz`, que es solo una abreviatura de
+`.tar.gz`.
+
+De forma predeterminada, `curl` y `wget` descargan archivos con el mismo nombre
+que la URL: en este caso, `main`.
+Usa uno de los comandos anteriores para guardar el tarball como `amdahl.tar.gz`.
+
+:::::::::::::::  solution
+
+## Comandos de `wget` y `curl`
+
+```bash
+[you@laptop:~]$ wget -O amdahl.tar.gz https://github.com/hpc-carpentry/amdahl/tarball/main
+# or
+[you@laptop:~]$ curl -o amdahl.tar.gz -L https://github.com/hpc-carpentry/amdahl/tarball/main
+```
+
+La opción `-L` de `curl` le indica que siga las redirecciones de URL (lo cual `wget`
+hace por defecto).
+
+
+
+:::::::::::::::::::::::::
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Después de descargar el archivo, usa `ls` para verlo en tu directorio de trabajo:
+
+```bash
+[you@laptop:~]$ ls
+```
+
+## Archivar archivos
+
+Uno de los mayores desafíos que enfrentamos al transferir datos entre sistemas
+HPC remotos es el gran número de archivos. Existe una sobrecarga al transferir
+cada archivo individual y, cuando transferimos grandes cantidades de archivos,
+esas sobrecargas se combinan y ralentizan nuestras transferencias en gran medida.
+
+La solución a este problema consiste en *archivar* múltiples archivos en un número 
+menor de archivos, pero más grandes, antes de transferir los datos. Esto con el 
+fin de mejorar la eficiencia de la transferencia. En ocasiones, combinaremos la 
+creación de archivos con *compresión* para reducir la cantidad de datos a 
+transferir y así acelerar el proceso. El comando de archivado más común que se 
+utiliza en un clúster HPC (Linux) es `tar`.
+
+`tar` puede usarse para combinar archivos y carpetas en un solo archivo y,
+opcionalmente, comprimir el resultado.
+Veamos el archivo que descargamos del sitio de la lección, `amdahl.tar.gz`.
+
+La parte `.gz` significa *gzip*, que es una biblioteca de compresión.
+Es común (¡aunque no necesario!) que este tipo de archivo pueda interpretarse
+leyendo su nombre: parece que alguien tomó archivos y carpetas relacionados con
+algo llamado "amdahl", los empaquetó en un solo archivo con `tar`, y luego
+comprimió ese archivo con `gzip` para ahorrar espacio.
+
+Veamos si ese es el caso, *sin* descomprimir el archivo.
+`tar` imprime la "**t**abla de contenidos" con la opción `-t`, para el archivo
+especificado con la opción `-f` seguida del nombre del archivo.
+Ten en cuenta que puedes concatenar las dos opciones: escribir `-t -f` es
+intercambiable con escribir `-tf` junto.
+Sin embargo, el argumento que sigue a `-f` debe ser un nombre de archivo, así
+que escribir `-ft` *no* funcionará.
+
+```bash
+[you@laptop:~]$ tar -tf amdahl.tar.gz
+hpc-carpentry-amdahl-46c9b4b/
+hpc-carpentry-amdahl-46c9b4b/.github/
+hpc-carpentry-amdahl-46c9b4b/.github/workflows/
+hpc-carpentry-amdahl-46c9b4b/.github/workflows/python-publish.yml
+hpc-carpentry-amdahl-46c9b4b/.gitignore
+hpc-carpentry-amdahl-46c9b4b/LICENSE
+hpc-carpentry-amdahl-46c9b4b/README.md
+hpc-carpentry-amdahl-46c9b4b/amdahl/
+hpc-carpentry-amdahl-46c9b4b/amdahl/__init__.py
+hpc-carpentry-amdahl-46c9b4b/amdahl/__main__.py
+hpc-carpentry-amdahl-46c9b4b/amdahl/amdahl.py
+hpc-carpentry-amdahl-46c9b4b/requirements.txt
+hpc-carpentry-amdahl-46c9b4b/setup.py
+```
+
+Este ejemplo de salida muestra una carpeta que contiene algunos archivos, donde
+`46c9b4b` es un hash de commit de [git][git-swc] de 8 caracteres que cambiará
+cuando el material fuente se actualice.
+
+Ahora descomprimamos el archivo. Ejecutaremos `tar` con algunas opciones comunes:
+
+- `-x` para e**x**traer el archivo
+- `-v` para salida **v**erbosa
+- `-z` para compresión g**z**ip
+- `-f «tarball»` para el archivo a descomprimir
+
+::::::::::::::::::::::::::::::::::::::  discussion
+
+## Extraer el archivo
+
+Usando las opciones anteriores, descomprime el tarball del código fuente en un
+nuevo directorio llamado "amdahl" usando `tar`.
+
+```bash
+[you@laptop:~]$ tar -xvzf amdahl.tar.gz
+```
+
+```output
+hpc-carpentry-amdahl-46c9b4b/
+hpc-carpentry-amdahl-46c9b4b/.github/
+hpc-carpentry-amdahl-46c9b4b/.github/workflows/
+hpc-carpentry-amdahl-46c9b4b/.github/workflows/python-publish.yml
+hpc-carpentry-amdahl-46c9b4b/.gitignore
+hpc-carpentry-amdahl-46c9b4b/LICENSE
+hpc-carpentry-amdahl-46c9b4b/README.md
+hpc-carpentry-amdahl-46c9b4b/amdahl/
+hpc-carpentry-amdahl-46c9b4b/amdahl/__init__.py
+hpc-carpentry-amdahl-46c9b4b/amdahl/__main__.py
+hpc-carpentry-amdahl-46c9b4b/amdahl/amdahl.py
+hpc-carpentry-amdahl-46c9b4b/requirements.txt
+hpc-carpentry-amdahl-46c9b4b/setup.py
+```
+
+Ten en cuenta que no necesitamos escribir `-x -v -z -f`, gracias a la
+concatenación de opciones, aunque el comando funciona igual de cualquier forma,
+siempre y cuando la lista concatenada termine con `f`, porque la siguiente
+cadena debe especificar el nombre del archivo a extraer.
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+La carpeta tiene un nombre poco conveniente, así que cambiémoslo por algo más
+práctico.
+
+```bash
+[you@laptop:~]$ mv hpc-carpentry-amdahl-46c9b4b amdahl
+```
+
+Verifica el tamaño del directorio extraído y compáralo con el tamaño del
+archivo comprimido, usando `du` para "uso de disco" (***d**isk **u**sage*).
+
+```bash
+[you@laptop:~]$ du -sh amdahl.tar.gz
+8.0K     amdahl.tar.gz
+[you@laptop:~]$ du -sh amdahl
+48K    amdahl
+```
+
+Los archivos de texto (incluyendo el código fuente de Python) se comprimen bien:
+¡el "tarball" es una sexta parte del tamaño total de los datos en bruto!
+
+Si quieres invertir el proceso, comprimiendo datos en bruto en lugar de
+extraerlos, usa la opción `c` en lugar de `x`, indica el nombre del archivo
+y luego proporciona un directorio para comprimir:
+
+```bash
+[you@laptop:~]$ tar -cvzf compressed_code.tar.gz amdahl
+```
+
+```output
+amdahl/
+amdahl/.github/
+amdahl/.github/workflows/
+amdahl/.github/workflows/python-publish.yml
+amdahl/.gitignore
+amdahl/LICENSE
+amdahl/README.md
+amdahl/amdahl/
+amdahl/amdahl/__init__.py
+amdahl/amdahl/__main__.py
+amdahl/amdahl/amdahl.py
+amdahl/requirements.txt
+amdahl/setup.py
+```
+
+Si proporcionas `amdahl.tar.gz` como nombre de archivo en el comando anterior,
+`tar` actualizará el tarball existente con cualquier cambio que hayas hecho en
+los archivos.
+Eso significaría agregar la nueva carpeta `amdahl` a la carpeta *existente*
+(`hpc-carpentry-amdahl-46c9b4b`) dentro del tarball, ¡duplicando el tamaño del
+archivo!
+
+:::::::::::::::::::::::::::::::::::::::::  callout
+
+## Trabajar con Windows
+
+Cuando transfieres archivos de texto desde un sistema Windows a un sistema Unix
+(Mac, Linux, BSD, Solaris, etc.), esto puede causar problemas. Windows codifica
+sus archivos de forma ligeramente diferente a Unix y agrega un carácter extra
+en cada línea.
+
+En un sistema Unix, cada línea de un archivo termina con un `\n` (nueva línea).
+En Windows, cada línea termina con un `\r\n` (retorno de carro (*carriage return*) + nueva línea).
+Esto a veces causa problemas.
+
+Aunque la mayoría de los lenguajes de programación y software modernos manejan
+esto correctamente, en algunos casos raros puedes encontrarte con un problema.
+La solución es convertir un archivo de codificación Windows a Unix con el
+comando `dos2unix`.
+
+Puedes identificar si un archivo tiene finales de línea de Windows con
+`cat -A filename`. Un archivo con finales de línea de Windows tendrá `^M$` al
+final de cada línea. Un archivo con finales de línea de Unix tendrá `$` al final
+de una línea.
+
+Para convertir el archivo, simplemente ejecuta `dos2unix filename`. (De forma
+contraria, para convertir de nuevo a formato Windows, puedes ejecutar
+`unix2dos filename`.)
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+## Transferir archivos y carpetas individuales con `scp`
+
+Para copiar un archivo individual hacia o desde el clúster, podemos usar `scp`
+("*secure copy*"). La sintaxis puede ser un poco compleja para usuarios nuevos,
+pero la desglosaremos. El comando `scp` es pariente del comando `ssh` que
+usamos para acceder al sistema y puede usar el mismo mecanismo de autenticación
+con clave pública.
+
+Para *subir a* otra computadora, el comando plantilla es
+
+```bash
+[you@laptop:~]$ scp local_file yourUsername@cluster.hpc-carpentry.org:remote_destination
+```
+
+en el que `@` y `:` son separadores de campos y `remote_destination` es una ruta
+relativa a tu directorio personal remoto, o un nuevo nombre de archivo si deseas
+cambiarlo, o tanto una ruta relativa *como* un nuevo nombre de archivo.
+Si no tienes una carpeta específica en mente, puedes omitir
+`remote_destination` y el archivo se copiará a tu directorio personal en la
+computadora remota (con su nombre original).
+Si incluyes un `remote_destination`, ten en cuenta que `scp` interpreta esto de
+la misma manera que `cp` al hacer copias locales:
+si existe y es una carpeta, el archivo se copia dentro de la carpeta; si existe
+y es un archivo, el archivo se sobrescribe con el contenido de `local_file`; si
+no existe, se asume que es un nombre de destino para `local_file`.
+
+Sube el material de la lección a tu directorio personal remoto así:
+
+```bash
+[you@laptop:~]$ scp amdahl.tar.gz yourUsername@cluster.hpc-carpentry.org:
+```
+
+:::::::::::::::::::::::::::::::::::::::  challenge
+
+## ¿Por qué no descargar directamente en HPC Carpentry's Cloud Cluster?
+
+La mayoría de los clústeres de computadoras están protegidos del Internet
+abierto por un *firewall*. Para mayor seguridad, algunos están configurados para
+permitir tráfico *entrante*, pero no *saliente*.
+Esto significa que una persona usuaria autenticada puede enviar un archivo a una
+máquina del clúster, pero una máquina del clúster no puede recuperar archivos
+desde la máquina de una persona usuaria ni desde Internet abierto.
+
+Intenta descargar el archivo directamente. Ten en cuenta que puede fallar, y
+¡está bien!
+
+:::::::::::::::  solution
+
+## Comandos
+
+```bash
+[you@laptop:~]$ ssh yourUsername@cluster.hpc-carpentry.org
+[yourUsername@login1 ~]$ wget -O amdahl.tar.gz https://github.com/hpc-carpentry/amdahl/tarball/main
+# or
+[yourUsername@login1 ~]$ curl -o amdahl.tar.gz https://github.com/hpc-carpentry/amdahl/tarball/main
+```
+
+:::::::::::::::::::::::::
+
+¿Funcionó? Si no, ¿qué muestra la terminal sobre lo que pasó?
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+## Transferir un directorio
+
+Para transferir un directorio completo, añadimos la opción `-r` de "**r**ecursivo": 
+esto copia el elemento especificado, todos los elementos que contiene y todos los 
+elementos de sus subdirectorios... hasta llegar al final del árbol de directorios 
+que tiene como raíz la carpeta que indicaste.
+
+```bash
+[you@laptop:~]$ scp -r amdahl yourUsername@cluster.hpc-carpentry.org:
+```
+
+:::::::::::::::::::::::::::::::::::::::::  callout
+
+## Precaución
+
+Para un directorio grande, ya sea por tamaño o número de archivos, copiar con
+`-r` puede tardar mucho en completarse.
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Al usar `scp`, quizá hayas notado que un `:` *siempre* sigue al nombre de la
+computadora remota.
+Una cadena *después* de `:` especifica el directorio remoto al que deseas
+transferir el archivo o carpeta, incluyendo un nuevo nombre si deseas renombrar
+el material remoto.
+Si dejas este campo en blanco, `scp` usa por defecto tu directorio personal y
+el nombre del material local a transferir.
+
+En computadoras Linux, `/` es el separador en rutas de archivos o directorios.
+Una ruta que comienza con `/` se llama *absoluta*, ya que no puede haber nada
+por encima de la raíz `/`.
+Una ruta que no comienza con `/` se llama *relativa*, ya que no está anclada a
+la raíz.
+
+Si quieres subir un archivo a una ubicación dentro de tu directorio personal,
+que suele ser el caso, entonces no necesitas un `/` *inicial*. Después de `:`
+puedes escribir la ruta de destino relativa a tu directorio personal.
+Si tu directorio personal *es* el destino, puedes dejar el campo de destino en
+blanco o escribir `~`, el atajo para tu directorio personal, por completitud.
+
+Con `scp`, una barra final en el directorio de destino es opcional y no tiene
+efecto. Una barra final en un directorio de origen es importante para otros
+comandos, como `rsync`.
+
+:::::::::::::::::::::::::::::::::::::::::  callout
+
+## Una nota sobre `rsync`
+
+A medida que ganas experiencia transfiriendo archivos, es posible que el
+comando `scp` te resulte limitado. La herramienta [rsync] proporciona funciones
+avanzadas para transferir archivos y normalmente es más rápida que `scp` y
+`sftp` (ver más abajo). Es especialmente útil para transferir archivos grandes
+y/o muchos archivos, y para sincronizar el contenido de carpetas entre
+computadoras.
+
+La sintaxis es similar a `scp`. Para transferir *a* otra computadora con las
+opciones más usadas:
+
+```bash
+[you@laptop:~]$ rsync -avP amdahl.tar.gz yourUsername@cluster.hpc-carpentry.org:
+```
+
+Las opciones son:
+
+- `-a` (**a**rchivo) para preservar marcas de tiempo, permisos y carpetas, entre
+  otras cosas; implica recursión
+- `-v` (**v**erboso) para obtener salida detallada y ayudar a monitorear la
+  transferencia
+- `-P` (partial/progress) para conservar archivos parcialmente transferidos en
+  caso de interrupción y también mostrar el progreso de la transferencia.
+
+Para copiar un directorio de forma recursiva, podemos usar las mismas opciones:
+
+```bash
+[you@laptop:~]$ rsync -avP amdahl yourUsername@cluster.hpc-carpentry.org:~/
+```
+
+Tal como está escrito, esto colocará el directorio local y su contenido dentro
+de tu directorio personal en el sistema remoto. Si se agrega una barra final al
+origen, no se creará un nuevo directorio correspondiente al directorio
+transferido, y el contenido del directorio de origen se copiará directamente en
+el directorio de destino.
+
+Para descargar un archivo, simplemente cambiamos el origen y el destino:
+
+```bash
+[you@laptop:~]$ rsync -avP yourUsername@cluster.hpc-carpentry.org:amdahl ./
+```
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Las transferencias de archivos con `scp` y `rsync` usan SSH para cifrar los
+datos enviados por la red. Así que, si puedes conectarte por SSH, podrás
+transferir archivos. Por defecto, SSH usa el puerto de red 22. Si se usa un
+puerto SSH personalizado, tendrás que especificarlo con la opción adecuada,
+frecuentemente `-p`, `-P` o `--port`. Revisa `--help` o la página `man` si no
+estás seguro.
+
+:::::::::::::::::::::::::::::::::::::::  challenge
+
+## Cambiar el puerto de rsync
+
+Supongamos que tenemos que conectar `rsync` a través del puerto 768 en lugar de
+22. ¿Cómo modificarías este comando?
+
+```bash
+[you@laptop:~]$ rsync amdahl.tar.gz yourUsername@cluster.hpc-carpentry.org:
+```
+
+*Pista:* revisa la página `man` o la "ayuda" de `rsync`.
+
+:::::::::::::::  solution
+
+## Solución
+
+```bash
+[you@laptop:~]$ man rsync
+[you@laptop:~]$ rsync --help | grep port
+     --port=PORT             specify double-colon alternate port number
+See http://rsync.samba.org/ for updates, bug reports, and answers
+[you@laptop:~]$ rsync --port=768 amdahl.tar.gz yourUsername@cluster.hpc-carpentry.org:
+```
+
+(Ten en cuenta que este comando fallará, ya que el puerto correcto en este caso
+es el predeterminado: 22.)
+
+
+
+:::::::::::::::::::::::::
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+## Transferir archivos de forma interactiva con FileZilla
+
+FileZilla es un cliente multiplataforma para descargar y subir archivos hacia y
+desde una computadora remota. Es totalmente a prueba de fallos y siempre
+funciona bastante bien. Usa el protocolo `sftp`. Puedes leer más sobre el uso
+del protocolo `sftp` en la línea de comandos en la
+[discusión de la lección](../learners/discuss.md).
+
+Descarga e instala el cliente FileZilla desde <https://filezilla-project.org>.
+Después de instalar y abrir el programa, deberías ver una ventana con un
+explorador de archivos de tu sistema local en el lado izquierdo de la pantalla.
+Cuando te conectes al clúster, tus archivos del clúster aparecerán en el lado
+derecho.
+
+Para conectarte al clúster, solo necesitas ingresar tus credenciales en la
+parte superior de la pantalla:
+
+- Host: `sftp://cluster.hpc-carpentry.org`
+- User: Tu nombre de usuario del clúster
+- Password: Tu contraseña del clúster
+- Port: (deja en blanco para usar el puerto predeterminado)
+
+Haz clic en "Quickconnect" para conectar. Deberías ver tus archivos remotos en
+el lado derecho de la pantalla. Puedes arrastrar y soltar archivos entre el
+lado izquierdo (local) y el derecho (remoto) de la pantalla para transferirlos.
+
+Por último, si necesitas mover archivos grandes (típicamente mayores a un
+gigabyte) de una computadora remota a otra computadora remota, entra por SSH a
+la computadora que hospeda los archivos y usa `scp` o `rsync` para transferirlos
+a la otra. Esto será más eficiente que usar FileZilla (o aplicaciones
+relacionadas) que copiarían desde el origen a tu máquina local y luego a la
+máquina de destino.
+
+[git-swc]: https://swcarpentry.github.io/git-novice/
+[rsync]: https://rsync.samba.org/
+
+:::::::::::::::::::::::::::::::::::::::: keypoints
+
+- `wget` y `curl -O` descargan un archivo desde Internet.
+- `scp` y `rsync` transfieren archivos hacia y desde tu computadora.
+- Puedes usar un cliente SFTP como FileZilla para transferir archivos con una GUI.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::

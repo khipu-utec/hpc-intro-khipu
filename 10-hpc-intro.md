@@ -1,0 +1,85 @@
+---
+title: ¿Por qué usar un clúster?
+teaching: 15
+exercises: 5
+---
+
+
+
+::::::::::::::::::::::::::::::::::::::: objectives
+
+- Describir qué es un sistema HPC
+- Identificar cómo un sistema HPC podría beneficiarlo.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:::::::::::::::::::::::::::::::::::::::: questions
+
+- ¿Por qué debería interesarme la Computación de Alto Rendimiento (HPC)?
+- ¿Qué puedo esperar aprender de este curso?
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Frecuentemente, los problemas de investigación que utilizan computación pueden superar las capacidades
+de la computadora de escritorio o laptop donde comenzaron:
+
+- Un estudiante de estadística quiere hacer una validación cruzada (*cross-validation*) de un modelo. Esto implica ejecutar
+  el modelo 1000 veces — pero cada ejecución toma una hora. Esto hará que ejecutar el modelo en
+  una laptop tome más de un mes. En este problema de investigación, los resultados finales se calculan después de que se hayan ejecutado los 1000 modelos, pero normalmente solo se ejecuta un modelo a la vez (en **serie**) en la laptop. Dado que cada una de las 1000 ejecuciones es
+  independiente de todas las demás, y si tuviéramos suficientes computadoras, es teóricamente
+  posible ejecutarlas todas a la vez (en **paralelo**).
+- Un investigador en genómica ha estado utilizando conjuntos de datos pequeños de secuencias, pero pronto recibirá un nuevo tipo de datos de secuenciación que es 10 veces más grande. De por sí, ya es un desafío abrir estos conjuntos de datos en una computadora; y realizar análisis con él probablemente la bloqueará. En este problema de investigación, los cálculos requeridos podrían ser imposibles de paralelizar, pero se necesitaría una computadora con **más memoria** para analizar el conjunto de datos mucho más grande en el futuro.
+- Un ingeniero está utilizando un paquete de dinámica de fluidos que tiene una opción para ejecutarse en paralelo. Hasta ahora, no ha tenido la necesidad de usar esta opción en su computadora de escritorio. Sin embargo, al pasar de simulaciones 2D a 3D, el tiempo de simulación se ha más que triplicado. Por lo tanto sería útil aprovechar esa opción o característica. En este problema de investigación, los cálculos en cada región de la simulación son en gran medida independientes de los cálculos en otras regiones de la simulación. Es posible ejecutar los cálculos de cada región simultáneamente (en **paralelo**), comunicar resultados seleccionados a las regiones adyacentes según sea necesario, y repetir los cálculos para converger en un conjunto final de resultados. Al pasar de un modelo 2D a uno 3D, **tanto la cantidad de datos como la cantidad de cálculos aumenta considerablemente**, y es teóricamente posible distribuir los cálculos entre múltiples computadoras que se encuentren comunicadas a través de una red compartida.
+
+En todos estos casos, se necesita el acceso a más computadoras (y más grandes). Esas computadoras deberían ser capaces de ser utilizadas al mismo tiempo, **resolviendo muchos problemas de investigadores en paralelo**.
+
+## Presentación Jargon Busting
+
+Abra la presentación [HPC Jargon Buster](files/jargon.html#p1)
+en una nueva pestaña. Para presentar el contenido, primero presione `C` para abrir un **c**lon en una
+ventana separada, y luego presione `P` para cambiar al modo de **p**resentación.
+
+::::::::::::::::::::::::::::::::::::::  challenge
+
+## Nunca he usado un servidor, ¿Debería usar uno?
+
+Tómate un minuto y piensa en cuáles de tus interacciones diarias con una
+computadora pueden requerir un servidor remoto o incluso un clúster para proporcionarte resultados.
+
+:::::::::::::::  solution
+
+## Algunas Ideas
+
+- Revisar el correo electrónico: tu computadora (posiblemente en tu bolsillo) se conecta a una máquina remota, se autentica y descarga una lista de nuevos mensajes; también sube cambios en el estado de los mensajes (si los leíste, los marcaste como spam o los eliminaste). Dado que tu cuenta no es la única, el servidor de correo probablemente sea uno de muchos en un centro de datos.
+- Realizar una búsqueda en línea implica comparar tu término de búsqueda con una
+  base de datos masiva de todos los sitios conocidos, buscando coincidencias. Esta operación de "consulta" puede ser sencilla, pero construir esa base de datos es una
+  [tarea monumental][mapreduce]. Los servidores están involucrados en cada paso.
+- Buscar direcciones en un sitio web de mapas implica conectar tus puntos (A)
+  de inicio y (B) de destino mediante el [recorrido de un grafo][dijkstra] en busca de
+  la ruta "más corta" por distancia, tiempo, costo u otra métrica. Convertir
+  un mapa a un grafo es relativamente simple, sin embargo, calcular todas las
+  rutas posibles entre A y B es costoso.
+
+Revisar el correo electrónico podría ser serial: tu máquina se conecta a un servidor y
+intercambia datos. Realizar una consulta a una base de datos por tu término de búsqueda (o
+palabras clave) también podría ser serial, en el sentido de que una máquina recibe tu consulta y
+devuelve el resultado. Sin embargo, el ensamble y almacenamiento de la base de datos completa escapa de la capacidad de cualquier máquina individual. Por lo tanto, estas funciones se sirven
+de una gran colección de servidores ["hiperescalables"][hyperscale]
+trabajando juntos.
+
+:::::::::::::::::::::::::
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+[mapreduce]: https://en.wikipedia.org/wiki/MapReduce
+[dijkstra]: https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+[hyperscale]: https://en.wikipedia.org/wiki/Hyperscale_computing
+
+:::::::::::::::::::::::::::::::::::::::: keypoints
+
+- La Computación de Alto Rendimiento (HPC en inglés, *High Performance Computing*) típicamente implica conectarse a sistemas de computación muy grandes que se encuentran en cualquier parte del mundo.
+- Estos sistemas pueden usarse para realizar trabajos que serían imposibles o mucho más lentos de completar en sistemas más pequeños.
+- Los recursos HPC son compartidos por múltiples usuarios.
+- El método estándar de interacción con dichos sistemas es a través de una interfaz de línea de comandos.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::

@@ -1,0 +1,533 @@
+---
+title: Ejecutar un trabajo paralelo
+teaching: 30
+exercises: 60
+---
+
+
+
+::::::::::::::::::::::::::::::::::::::: objectives
+
+- Instalar un paquete de Python usando `pip`
+- Preparar un script de envío de trabajo para el ejecutable paralelo.
+- Lanzar trabajos con ejecución paralela.
+- Registrar y resumir el tiempo y la precisión de los trabajos.
+- Describir la relación entre el paralelismo del trabajo y el rendimiento.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+:::::::::::::::::::::::::::::::::::::::: questions
+
+- ¿Cómo ejecutamos una tarea en paralelo?
+- ¿Qué beneficios surgen de la ejecución paralela?
+- ¿Cuáles son los límites de las ganancias de la ejecución en paralelo?
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Ahora tenemos las herramientas que necesitamos para ejecutar un trabajo multiprocesador. Este es un aspecto muy importante de los sistemas HPC, ya que el paralelismo es una de las herramientas principales que tenemos para mejorar el rendimiento de las tareas computacionales.
+
+Si se desconectó, vuelva a iniciar sesión en el clúster.
+
+```bash
+[you@laptop:~]$ ssh yourUsername@cluster.hpc-carpentry.org
+```
+
+## Instalar el Programa Amdahl
+
+Con el código fuente de Amdahl en el clúster, podemos instalarlo, lo que proporcionará acceso al ejecutable `amdahl`.
+Moverse al directorio extraído, luego use el Instalador de Paquetes para Python, o `pip`, para instalarlo en su directorio de inicio ("usuario"):
+
+```bash
+[yourUsername@login1 ~]$ cd amdahl
+[yourUsername@login1 ~]$ python3 -m pip install --user .
+```
+
+:::::::::::::::::::::::::::::::::::::::::  callout
+
+## Amdahl es Código Python
+
+El programa Amdahl está escrito en Python, e instalarlo o usarlo requiere
+ubicando el ejecutable `python3` en el nodo de inicio de sesión.
+Si no se puede encontrar, intente listar los módulos disponibles usando `module avail`,
+cargue el apropiado e intente el comando de nuevo.
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+### MPI para Python
+
+El código de Amdahl tiene una dependencia: **mpi4py**.
+Si aún no se ha instalado en el clúster, `pip` intentará
+recopilar mpi4py de Internet e instalarlo para usted.
+Si esto falla debido a un firewall unidireccional, debe recuperar mpi4py en su
+máquina local y cargarlo, tal como hicimos con Amdahl.
+
+::::::::::::::::::::::::::::::::::::::  discussion
+
+## Recuperar y Cargar `mpi4py`
+
+Si la instalación de Amdahl falló porque no se pudo instalar mpi4py,
+recupere el tarball de <https://github.com/mpi4py/mpi4py/tarball/master>
+luego `rsync` lo al clúster, extraiga e instale:
+
+```bash
+[you@laptop:~]$ wget -O mpi4py.tar.gz https://github.com/mpi4py/mpi4py/releases/download/3.1.4/mpi4py-3.1.4.tar.gz
+[you@laptop:~]$ scp mpi4py.tar.gz yourUsername@cluster.hpc-carpentry.org:
+# or
+[you@laptop:~]$ rsync -avP mpi4py.tar.gz yourUsername@cluster.hpc-carpentry.org:
+```
+
+```bash
+[you@laptop:~]$ ssh yourUsername@cluster.hpc-carpentry.org
+[yourUsername@login1 ~]$ tar -xvzf mpi4py.tar.gz  # extract the archive
+[yourUsername@login1 ~]$ mv mpi4py* mpi4py        # rename the directory
+[yourUsername@login1 ~]$ cd mpi4py
+[yourUsername@login1 ~]$ python3 -m pip install --user .
+[yourUsername@login1 ~]$ cd ../amdahl
+[yourUsername@login1 ~]$ python3 -m pip install --user .
+```
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+::::::::::::::::::::::::::::::::::::::  discussion
+
+## Si `pip` Genera una Advertencia...
+
+`pip` puede advertir que sus binarios de paquete de usuario no están en su PATH.
+
+```warning
+WARNING: The script amdahl is installed in "${HOME}/.local/bin" which is
+not on PATH. Consider adding this directory to PATH or, if you prefer to
+suppress this warning, use --no-warn-script-location.
+```
+
+Para verificar si esta advertencia es un problema, use `which` para buscar el
+programa `amdahl`:
+
+```bash
+[yourUsername@login1 ~]$ which amdahl
+```
+
+Si el comando no devuelve ninguna salida y muestra un nuevo *prompt*, significa que el archivo
+`amdahl` no se ha encontrado. Debes actualizar la variable de entorno llamada
+`PATH` para incluir la carpeta que falta.
+Edite su archivo de configuración de shell de la siguiente manera, luego cierre sesión del clúster y
+vuelva a conectarse para que los cambios surtan efecto.
+
+```bash
+[yourUsername@login1 ~]$ nano ~/.bashrc
+[yourUsername@login1 ~]$ tail ~/.bashrc
+```
+
+```output
+export PATH=${PATH}:${HOME}/.local/bin
+```
+
+Después de volver a iniciar sesión en cluster.hpc-carpentry.org, `which` debería ser capaz de
+encontrar `amdahl` sin dificultades.
+Si tuvo que cargar un módulo de Python, cárguelo de nuevo.
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+## ¡Ayuda!
+
+Muchos programas de línea de comandos incluyen un mensaje de "ayuda". Pruébelo con `amdahl`:
+
+```bash
+[yourUsername@login1 ~]$ amdahl --help
+```
+
+```output
+usage: amdahl [-h] [-p [PARALLEL_PROPORTION]] [-w [WORK_SECONDS]] [-t] [-e] [-j [JITTER_PROPORTION]]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p [PARALLEL_PROPORTION], --parallel-proportion [PARALLEL_PROPORTION]
+                        Parallel proportion: a float between 0 and 1
+  -w [WORK_SECONDS], --work-seconds [WORK_SECONDS]
+                        Total seconds of workload: an integer greater than 0
+  -t, --terse           Format output as a machine-readable object for easier analysis
+  -e, --exact           Exactly match requested timing by disabling random jitter
+  -j [JITTER_PROPORTION], --jitter-proportion [JITTER_PROPORTION]
+                        Random jitter: a float between -1 and +1
+```
+
+Este mensaje no nos dice mucho sobre lo que el programa *hace*, pero sí
+nos dice las opciones importantes que podríamos querer usar al iniciarlo.
+
+## Ejecutar el Trabajo en un Nodo de Cómputo
+
+Cree un archivo de envío (*submission file*), solicitando una tarea en un solo nodo, luego envíalo.
+
+
+```bash
+[yourUsername@login1 ~]$ nano serial-job.sh
+[yourUsername@login1 ~]$ cat serial-job.sh
+```
+
+```bash
+#!/bin/bash
+#SBATCH -J solo-job
+#SBATCH -p cpubase_bycore_b1
+#SBATCH -N 1
+#SBATCH -n 1
+
+# Load the computing environment we need
+module load Python
+
+# Execute the task
+amdahl
+```
+
+```bash
+[yourUsername@login1 ~]$ sbatch serial-job.sh
+```
+
+Como antes, use los comandos de estado Slurm para verificar si su trabajo
+está en ejecución y cuándo se completa:
+
+```bash
+[yourUsername@login1 ~]$ squeue -u yourUsername
+```
+
+Use `ls` para ubicar el archivo de salida. La opción `-t` ordena en
+orden cronológico inverso: el más nuevo primero. ¿Cuál fue la salida?
+
+:::::::::::::::  spoiler
+
+## Leer la Salida del Trabajo
+
+La salida del clúster debe escribirse en un archivo en la carpeta desde la cual
+inició el trabajo. Por ejemplo,
+
+```bash
+[yourUsername@login1 ~]$ ls -t
+```
+
+```output
+slurm-347087.out  serial-job.sh  amdahl  README.md  LICENSE.txt
+```
+
+```bash
+[yourUsername@login1 ~]$ cat slurm-347087.out
+```
+
+```output
+Doing 30.000 seconds of 'work' on 1 processor,
+which should take 30.000 seconds with 0.850 parallel proportion of the workload.
+
+  Hello, World! I am process 0 of 1 on smnode1. I will do all the serial 'work' for 4.500 seconds.
+  Hello, World! I am process 0 of 1 on smnode1. I will do parallel 'work' for 25.500 seconds.
+
+Total execution time (according to rank 0): 30.033 seconds
+```
+
+:::::::::::::::::::::::::
+
+Como vimos antes, dos de las opciones del programa `amdahl` establecen la cantidad de trabajo y
+la proporción de ese trabajo que es de naturaleza paralela. Según la salida, podemos
+ver que el código utiliza un valor predeterminado de 30 segundos de trabajo que es 85%
+paralelo. El programa se ejecutó durante poco más de 30 segundos en total, y si ejecutamos los
+números, es cierto que el 15% fue marcado como 'serial' y el 85% como 'paralelo'.
+
+Dado que solo le dimos al trabajo una CPU, este trabajo no era realmente paralelo: el mismo
+procesador realizó el trabajo 'serial' durante 4.5 segundos, luego la parte 'paralela'
+durante 25.5 segundos, y no se ahorró tiempo. El clúster puede hacerlo mejor, si lo solicitamos.
+
+## Ejecutar el Trabajo Paralelo
+
+El programa `amdahl` utiliza la Interfaz de Paso de Mensajes (MPI) para el paralelismo
+-- esta es una herramienta común en los sistemas HPC.
+
+:::::::::::::::::::::::::::::::::::::::::  callout
+
+## ¿Qué es MPI?
+
+La Interfaz de Paso de Mensajes (* Message Passing Interface*) es un conjunto de herramientas que permiten que múltiples tareas
+que se ejecutan simultáneamente se comuniquen entre sí.
+Típicamente, un ejecutable único se ejecuta varias veces, posiblemente en diferentes
+máquinas, y las herramientas de MPI se utilizan para informar a cada instancia del
+ejectable sobre sus procesos hermanos, y cuál instancia es.
+MPI también proporciona herramientas para permitir la comunicación entre instancias para
+coordinar el trabajo, intercambiar información sobre elementos de la tarea o
+transferir datos.
+Una instancia de MPI típicamente tiene su propia copia de todas las variables locales.
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Aunque los ejecutables que son conscientes de MPI (*MPI-aware*) generalmente se pueden ejecutar como programas independientes, para
+que se ejecuten en paralelo deben usar un *entorno de tiempo de ejecución* de MPI,
+que es una implementación específica del *estándar* de MPI.
+Para activar el entorno de MPI, el programa debe iniciarse mediante un comando
+como `mpiexec` (o `mpirun`, o `srun`, etc. dependiendo del tiempo de ejecución de MPI
+que necesite usar), lo que garantizará que el soporte de tiempo de ejecución apropiado para
+el paralelismo esté incluido.
+
+:::::::::::::::::::::::::::::::::::::::::  callout
+
+## Argumentos de Tiempo de Ejecución de MPI
+
+Por sí solos, comandos como `mpiexec` pueden tomar muchos argumentos especificando
+cuántas máquinas participarán en la ejecución,
+y podría necesitar estos si desea ejecutar un programa MPI en su propio
+(por ejemplo, en su computadora portátil).
+En el contexto de un sistema de colas, sin embargo, frecuentemente ocurre que
+el tiempo de ejecución de MPI obtendrá los parámetros necesarios del sistema de colas,
+examinando las variables de entorno establecidas cuando se inicia el trabajo.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Modifiquemos el script de trabajo para solicitar más núcleos y usar el tiempo de ejecución de MPI.
+
+
+```bash
+[yourUsername@login1 ~]$ cp serial-job.sh parallel-job.sh
+[yourUsername@login1 ~]$ nano parallel-job.sh
+[yourUsername@login1 ~]$ cat parallel-job.sh
+```
+
+```bash
+#!/bin/bash
+#SBATCH -J parallel-job
+#SBATCH -p cpubase_bycore_b1
+#SBATCH -N 1
+#SBATCH -n 4
+
+# Load the computing environment we need
+# (mpi4py and numpy are in SciPy-bundle)
+module load Python
+module load SciPy-bundle
+
+# Execute the task
+mpiexec amdahl
+```
+
+Then submit your job. Note that the submission command has not really changed
+from how we submitted the serial job: all the parallel settings are in the
+batch file rather than the command line.
+
+```bash
+[yourUsername@login1 ~]$ sbatch parallel-job.sh
+```
+
+As before, use the status commands to check when your job runs.
+
+```bash
+[yourUsername@login1 ~]$ ls -t
+```
+
+```output
+slurm-347178.out  parallel-job.sh  slurm-347087.out  serial-job.sh  amdahl  README.md  LICENSE.txt
+```
+
+```bash
+[yourUsername@login1 ~]$ cat slurm-347178.out
+```
+
+```output
+Doing 30.000 seconds of 'work' on 4 processors,
+which should take 10.875 seconds with 0.850 parallel proportion of the workload.
+
+  Hello, World! I am process 0 of 4 on smnode1. I will do all the serial 'work' for 4.500 seconds.
+  Hello, World! I am process 2 of 4 on smnode1. I will do parallel 'work' for 6.375 seconds.
+  Hello, World! I am process 1 of 4 on smnode1. I will do parallel 'work' for 6.375 seconds.
+  Hello, World! I am process 3 of 4 on smnode1. I will do parallel 'work' for 6.375 seconds.
+  Hello, World! I am process 0 of 4 on smnode1. I will do parallel 'work' for 6.375 seconds.
+
+Total execution time (according to rank 0): 10.888 seconds
+```
+
+:::::::::::::::::::::::::::::::::::::::  challenge
+
+## ¿Es 4× más rápido?
+
+El trabajo paralelo recibió 4× más procesadores que el trabajo serial:
+¿significa que se completó en ¼ del tiempo?
+
+:::::::::::::::  solution
+
+## Solución
+
+El trabajo paralelo sí tomó *menos* tiempo: ¡11 segundos es mejor que 30!
+Pero es solo una mejora de 2.7×, no de 4×.
+
+Mire la salida del trabajo:
+
+- Mientras que el "proceso 0" realizaba trabajo serial, los procesos 1 al 3 realizaban su
+  trabajo paralelo.
+- Mientras que el proceso 0 se ponía al día con su trabajo paralelo,
+  el resto no hacía nada en absoluto.
+
+El proceso 0 siempre tiene que terminar su tarea serial antes de poder comenzar con el
+trabajo paralelo. Esto establece un límite inferior en la cantidad de tiempo que este trabajo
+tomará, sin importar cuántos núcleos le arroje.
+
+Este es el principio básico detrás de la [Ley de Amdahl][amdahl], que es una forma
+de predecir mejoras en el tiempo de ejecución para una carga de trabajo **fija** que
+puede subdividirse y ejecutarse en paralelo hasta cierto punto.
+
+:::::::::::::::::::::::::
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+## ¿Cuánto Mejora el Rendimiento la Ejecución Paralela?
+
+En teoría, dividir un cálculo perfectamente paralelo entre *n* procesos de MPI
+debería producir una disminución en el tiempo de ejecución total por un factor de *n*.
+Como hemos visto, los programas reales necesitan algo de tiempo para que los procesos de MPI
+se comuniquen y coordinen, y algunos tipos de cálculos no se pueden subdividir:
+solo se ejecutan efectivamente en un solo CPU.
+
+Además, si los procesos de MPI operan en diferentes CPUs físicas en la
+computadora, o en múltiples nodos de cálculo, se requiere aún más tiempo para
+la comunicación que cuando todos los procesos operan en un solo CPU.
+
+En la práctica, es común evaluar el paralelismo de un programa de MPI por
+
+- ejecutar el programa en una variedad de números de CPU,
+- registrar el tiempo de ejecución en cada ejecución,
+- comparando cada tiempo de ejecución con el tiempo cuando se usa una sola CPU.
+
+Puesto que "más es mejor" -- la mejora es más fácil de interpretar a partir de aumentos en
+alguna cantidad que disminuciones -- las comparaciones se hacen usando el factor de aceleración
+*S*, que se calcula como el tiempo de ejecución de un solo CPU dividido por el tiempo de
+ejecución de varios CPU. Para un programa perfectamente paralelo, una gráfica de la aceleración *S*
+frente al número de CPUs *n* daría una línea recta, *S* = *n*.
+
+Ejecutemos un trabajo más, para que podamos ver cuán cerca de una línea recta nuestro código `amdahl`
+llegue.
+
+
+```bash
+[yourUsername@login1 ~]$ nano parallel-job.sh
+[yourUsername@login1 ~]$ cat parallel-job.sh
+```
+
+```bash
+#!/bin/bash
+#SBATCH -J parallel-job
+#SBATCH -p cpubase_bycore_b1
+#SBATCH -N 1
+#SBATCH -n 8
+
+# Load the computing environment we need
+# (mpi4py and numpy are in SciPy-bundle)
+module load Python
+module load SciPy-bundle
+
+# Execute the task
+mpiexec amdahl
+```
+
+Then submit your job. Note that the submission command has not really changed
+from how we submitted the serial job: all the parallel settings are in the
+batch file rather than the command line.
+
+```bash
+[yourUsername@login1 ~]$ sbatch parallel-job.sh
+```
+
+As before, use the status commands to check when your job runs.
+
+```bash
+[yourUsername@login1 ~]$ ls -t
+```
+
+```output
+slurm-347271.out  parallel-job.sh  slurm-347178.out  slurm-347087.out  serial-job.sh  amdahl  README.md  LICENSE.txt
+```
+
+```bash
+[yourUsername@login1 ~]$ cat slurm-347178.out
+```
+
+```output
+which should take 7.688 seconds with 0.850 parallel proportion of the workload.
+
+  Hello, World! I am process 4 of 8 on smnode1. I will do parallel 'work' for 3.188 seconds.
+  Hello, World! I am process 0 of 8 on smnode1. I will do all the serial 'work' for 4.500 seconds.
+  Hello, World! I am process 2 of 8 on smnode1. I will do parallel 'work' for 3.188 seconds.
+  Hello, World! I am process 1 of 8 on smnode1. I will do parallel 'work' for 3.188 seconds.
+  Hello, World! I am process 3 of 8 on smnode1. I will do parallel 'work' for 3.188 seconds.
+  Hello, World! I am process 5 of 8 on smnode1. I will do parallel 'work' for 3.188 seconds.
+  Hello, World! I am process 6 of 8 on smnode1. I will do parallel 'work' for 3.188 seconds.
+  Hello, World! I am process 7 of 8 on smnode1. I will do parallel 'work' for 3.188 seconds.
+  Hello, World! I am process 0 of 8 on smnode1. I will do parallel 'work' for 3.188 seconds.
+
+Total execution time (according to rank 0): 7.697 seconds
+```
+
+::::::::::::::::::::::::::::::::::::::  discussion
+
+## Salida No Lineal
+
+Cuando ejecutamos el trabajo con 4 trabajadores paralelos, el trabajo serial escribía su salida
+primero, luego los procesos paralelos escribían su salida, con el proceso 0 viniendo
+primero y último.
+
+Con 8 trabajadores, este no es el caso: dado que los trabajadores paralelos toman menos
+tiempo que el trabajo serial, es difícil decir cuál proceso escribirá su
+salida primero, ¡excepto que *no* será el proceso 0!
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Ahora, resumamos la cantidad de tiempo que tardó cada trabajo en ejecutarse:
+
+| Número de CPUs | Tiempo de Ejecución (seg) |
+| -------------- | ------------- |
+| 1              | 30\.033        |
+| 4              | 10\.888        |
+| 8              | 7\.697         |
+
+Luego, use la primera fila para calcular aceleraciones $S$, usando Python como
+calculadora de línea de comandos y la fórmula
+
+$$
+S(t_{n}) = \frac{t_{1}}{t_{n}}
+$$
+
+```bash
+[yourUsername@login1 ~]$ for n in 30.033 10.888 7.697; do python3 -c "print(30.033 / $n)"; done
+```
+
+| Número de CPUs | Aceleración   | Ideal |
+| -------------- | ------------- | ----- |
+| 1              | 1\.0           | 1     |
+| 4              | 2\.75          | 4     |
+| 8              | 3\.90          | 8     |
+
+Los archivos de salida del trabajo nos han estado diciendo que este programa está ejecutando el 85%
+de su trabajo en paralelo, dejando el 15% para ejecutarse en serie. Esto parece razonablemente
+alto, pero nuestro rápido estudio de aceleración muestra que para obtener una aceleración de 4×,
+tenemos que usar 8 o 9 procesadores en paralelo. En programas reales, el factor de
+aceleración está influenciado por
+
+- diseño de CPU
+- red de comunicación entre nodos de cálculo
+- implementaciones de biblioteca de MPI
+- detalles del programa de MPI mismo
+
+Usando la Ley de Amdahl, puede probar que con este programa, es *imposible*
+alcanzar una aceleración de 8×, sin importar cuántos procesadores tenga a mano. Los detalles de
+ese análisis, con resultados que lo respalden, se dejan para la próxima clase en el
+taller de *HPC Carpentry*, *HPC Workflows*.
+
+En un entorno HPC, intentamos reducir el tiempo de ejecución para todos los tipos de
+trabajos, y MPI es una forma extremadamente común de combinar docenas, cientos o
+miles de CPUs para resolver un solo problema. Para obtener más información sobre
+paralelización, consulte la lección de [lección para principiantes en paralelo][parallel-novice].
+
+
+[amdahl]: https://en.wikipedia.org/wiki/Amdahl\'s_law
+[parallel-novice]: https://www.hpc-carpentry.org/hpc-parallel-novice/
+
+
+:::::::::::::::::::::::::::::::::::::::: keypoints
+
+- La programación paralela permite que las aplicaciones aprovechen el hardware paralelo.
+- El sistema de colas facilita la ejecución de tareas paralelas.
+- Las mejoras de rendimiento de la ejecución paralela no se escalan linealmente.
+
+::::::::::::::::::::::::::::::::::::::::::::::::::
