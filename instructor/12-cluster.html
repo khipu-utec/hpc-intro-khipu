@@ -365,7 +365,7 @@
       </div>
       <hr></nav><main id="main-content" class="main-content"><div class="container lesson-content">
         <h1>Trabajando en un sistema HPC remoto</h1>
-        <p>Última actualización: 2026-03-24 |
+        <p>Última actualización: 2026-03-27 |
 
         <a href="https://github.com/Maro-HPC/hpc-intro-es.git/edit/main/episodes/12-cluster.Rmd" class="external-link">Mejora esta página <i aria-hidden="true" data-feather="edit"></i></a></p>
 
@@ -609,10 +609,15 @@ comando <code>sinfo</code>.</p>
 <div class="codewrapper">
 <h3 class="code-label">SALIDA<i aria-hidden="true" data-feather="chevron-left"></i><i aria-hidden="true" data-feather="chevron-right"></i>
 </h3>
-<pre class="output" tabindex="0"><code>PARTITION          AVAIL  TIMELIMIT  NODES  STATE NODELIST
-cpubase_bycore_b1*    up   infinite      4   idle node[1-2],smnode[1-2]
-node                  up   infinite      2   idle node[1-2]
-smnode                up   infinite      2   idle smnode[1-2]</code></pre>
+<pre class="output" tabindex="0"><code>PARTITION    AVAIL  TIMELIMIT  NODES  STATE NODELIST
+debug*          up   infinite      2   idle n[004-005]
+debug-gpu       up   infinite      1   idle g001
+standard        up   infinite      2    mix n[003,006]
+standard        up   infinite      2   idle n[004-005]
+big-mem         up   infinite      1    mix n006
+gpu             up   infinite      1    mix ag001
+gpu             up   infinite      2   idle g[001-002]
+data-science    up   infinite      1   idle ds001</code></pre>
 </div>
 <p>También hay máquinas especializadas que se usan para gestionar
 almacenamiento en disco, autenticación de usuarios y otras tareas de
@@ -902,8 +907,8 @@ nodos.”</li>
   "url": "https://maro-hpc.github.io/hpc-intro-es/instructor/12-cluster.html",
   "identifier": "https://maro-hpc.github.io/hpc-intro-es/instructor/12-cluster.html",
   "dateCreated": "2026-01-24",
-  "dateModified": "2026-03-24",
-  "datePublished": "2026-03-24"
+  "dateModified": "2026-03-27",
+  "datePublished": "2026-03-27"
 }
 
   </script><script>
